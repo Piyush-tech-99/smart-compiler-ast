@@ -50,7 +50,7 @@ function App() {
         body: JSON.stringify({ code })
       })
       const data = await res.json()
-      setAst(data)   // 👉 THIS updates right panel
+      setAst(data)   
     } catch (err) {
       setAst(null)
     }
@@ -88,7 +88,7 @@ function App() {
 
   return (
     <div className="app-container">
-      <h1>💻 Smart Compiler Project</h1>
+      <h1>💻 Smart Online Compiler And Abstract Syntax Tree Visualizer</h1>
 
       <div className="main">
 

@@ -2,12 +2,12 @@ import Tree from "react-d3-tree"
 
 export default function ASTViewer({ treeData }) {
 
-  // ✅ SAFE CHECK
+  //  SAFE CHECK
   if (!treeData || treeData.error) {
     return <p>No AST available</p>
   }
 
-  // ✅ CONVERT ACORN AST → TREE FORMAT
+  //  CONVERT ACORN AST → TREE FORMAT
   const convert = (node) => {
     if (!node || typeof node !== "object") return null
 
