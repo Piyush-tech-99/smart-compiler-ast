@@ -7,202 +7,234 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-app.post('/run', (req, res) => {
-  const { code } = req.body
 
-  let logs = []
-
-  const vm = new VM({
-    timeout: 1000,
-    sandbox: {
-      console: {
-        log: (...args) => logs.push(args.join(" "))
-      }
-    }
-  })
+app.post('/run', async (req, res) => {
+  const { code, language } = req.body
 
   try {
-    const result = vm.run(code)
+   
+    if (language === "javascript") {
+      let logs = []
 
-    res.json({
-      output: logs.length ? logs.join("\n") : String(result)
-    })
-  } catch (e) {
-    res.json({ output: e.toString() })
-  }
-})
+      const vm = new VM({
+        timeout: 1000,
+        sandbox: {
+          console: {
+            log: (...args) => logs.push(args.join(" "))
+          }
+        }
+      })
 
-// AST
-app.post('/ast', (req, res) => {
-  try {
-    const ast = acorn.parse(req.body.code, { ecmaVersion: 'latest' })
-    res.json(ast)
-  } catch (e) {
-    res.json({ error: e.toString() })
-  }
-})
+      vm.run(code)
 
-//  TOKENS
-app.post('/tokens', (req, res) => {
-  try {
-    const tokenizer = acorn.tokenizer(req.body.code, { ecmaVersion: 'latest' })
-    let tokens = []
-
-    for (let token of tokenizer) {
-      tokens.push({
-        type: token.type.label,
-        value: token.value
+      return res.json({
+        output: logs.join("\n") || "No output"
       })
     }
 
-    res.json(tokens)
+    let finalCode = code
+    if (language === "java") {
+      finalCode = code.replace(/class\s+\w+/, "class Main")
+    }
+
+    const langMap = { c: 50, cpp: 54, java: 62 }
+
+    const submit = await fetch("https://ce.judge0.com/submissions?base64_encoded=false", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_code: finalCode,
+        language_id: langMap[language]
+      })
+    })
+
+    const { token } = await submit.json()
+
+    await new Promise(r => setTimeout(r, 2000))
+
+    const result = await fetch(`https://ce.judge0.com/submissions/${token}?base64_encoded=false`)
+    const data = await result.json()
+
+    return res.json({
+      output: data.stdout || data.stderr || data.compile_output || "No output"
+    })
+
+  } catch (e) {
+    return res.json({ output: e.toString() })
+  }
+})
+
+
+app.post('/ast', (req, res) => {
+  const { code, language } = req.body
+
+  try {
+    if (language === "javascript") {
+      const ast = acorn.parse(code, { ecmaVersion: 'latest' })
+      return res.json(ast)
+    }
+
+    const lines = code.split("\n").filter(l => l.trim() !== "")
+
+    let ast = {
+      name: "Program",
+      children: []
+    }
+
+    lines.forEach(line => {
+      let node = { name: "", children: [] }
+
+      if (line.includes("#include")) node.name = "Preprocessor"
+      else if (line.includes("main")) node.name = "FunctionDeclaration"
+      else if (line.includes("printf") || line.includes("cout") || line.includes("System.out")) node.name = "PrintStatement"
+      else if (line.includes("return")) node.name = "ReturnStatement"
+      else node.name = "Statement"
+
+      node.children.push({ name: line.trim() })
+      ast.children.push(node)
+    })
+
+    return res.json(ast)
+
   } catch (e) {
     res.json({ error: e.toString() })
   }
 })
 
-//  SEMANTIC 
-app.post('/semantic', (req, res) => {
+
+app.post('/tokens', (req, res) => {
+  const { code, language } = req.body
+
   try {
-    const ast = acorn.parse(req.body.code, { ecmaVersion: 'latest' })
+    if (language === "javascript") {
+      const tokenizer = acorn.tokenizer(code, { ecmaVersion: 'latest' })
+      let tokens = []
 
-    let declaredVars = new Set()
-    let builtInFuncs = new Set(["console", "log"])
-    let errors = []
-
-    function traverse(node) {
-      if (!node || typeof node !== 'object') return
-
-      // Variable Declaration
-      if (node.type === 'VariableDeclaration') {
-        node.declarations.forEach(d => {
-          declaredVars.add(d.id.name)
+      for (let token of tokenizer) {
+        tokens.push({
+          type: token.type.label,
+          value: token.value || token.type.label
         })
       }
 
-      // Identifier usage
-      if (node.type === 'Identifier') {
-        if (!declaredVars.has(node.name) && !builtInFuncs.has(node.name)) {
-          errors.push(`Variable '${node.name}' is not declared`)
-        }
-      }
-
-      // Function Call
-      if (node.type === 'CallExpression') {
-
-        if (node.callee.type === 'Identifier') {
-          let funcName = node.callee.name
-          if (!builtInFuncs.has(funcName)) {
-            errors.push(`Function '${funcName}' is not defined`)
-          }
-        }
-
-        if (node.callee.type === 'MemberExpression') {
-          let obj = node.callee.object.name
-          let prop = node.callee.property.name
-
-          if (obj !== "console" || prop !== "log") {
-            errors.push(`Unknown function '${obj}.${prop}'`)
-          }
-        }
-      }
-
-      for (let key in node) {
-        if (Array.isArray(node[key])) {
-          node[key].forEach(traverse)
-        } else {
-          traverse(node[key])
-        }
-      }
+      return res.json(tokens)
     }
 
-    traverse(ast)
+    const words = code.split(/\s+/)
+
+    const tokens = words.map(w => ({
+      type: "token",
+      value: w
+    }))
+
+    res.json(tokens)
+
+  } catch (e) {
+    res.json({ error: e.toString() })
+  }
+})
+
+
+app.post('/semantic', (req, res) => {
+  const { code, language } = req.body
+
+  try {
+    let errors = []
+    const lines = code.split("\n")
+
+    if (language !== "javascript") {
+      lines.forEach((line, i) => {
+        const t = line.trim()
+
+        if (
+          t &&
+          !t.endsWith(";") &&
+          !t.endsWith("{") &&
+          !t.endsWith("}") &&
+          !t.startsWith("#")
+        ) {
+          errors.push(`Line ${i + 1}: Missing semicolon`)
+        }
+      })
+    }
+
+    if (code.trim() === "") {
+      errors.push("Empty program")
+    }
+
+    if (language === "javascript") {
+      try {
+        acorn.parse(code, { ecmaVersion: 'latest' })
+      } catch (e) {
+        errors.push(e.message)
+      }
+    }
 
     res.json({
       errors: errors.length ? errors : ["No semantic errors"]
     })
 
   } catch (e) {
-    res.json({ error: e.toString() })
+    res.json({ errors: [e.toString()] })
   }
 })
 
+
 app.post('/ir', (req, res) => {
-  try {
-    const ast = acorn.parse(req.body.code, { ecmaVersion: 'latest' })
+  const { code } = req.body
 
-    let ir = []
-    let temp = 1
+  const lines = code.split("\n").filter(l => l.trim() !== "")
 
-    function generate(node) {
-      if (!node) return ""
+  let ir = []
+  let t = 1
 
-      //  Variable Declaration
-      if (node.type === 'VariableDeclaration') {
-        node.declarations.forEach(d => {
-          let val = generate(d.init)
-          ir.push(`${d.id.name} = ${val}`)
-        })
-      }
+  lines.forEach(line => {
+    ir.push(`t${t++}: ${line.trim()}`)
+  })
 
-      //  Assignment Expression 
-      if (node.type === 'AssignmentExpression') {
-        let left = generate(node.left)
-        let right = generate(node.right)
+  res.json(ir)
+})
 
-        ir.push(`${left} = ${right}`)
-        return left
-      }
 
-      //  Binary Expression
-      if (node.type === 'BinaryExpression') {
-        let left = generate(node.left)
-        let right = generate(node.right)
+app.post('/cfg', (req, res) => {
+  const { code } = req.body
 
-        let t = `t${temp++}`
-        ir.push(`${t} = ${left} ${node.operator} ${right}`)
-        return t
-      }
+  const lines = code.split("\n").filter(l => l.trim() !== "")
 
-      //  Identifier
-      if (node.type === 'Identifier') {
-        return node.name
-      }
+  let nodes = []
+  let edges = []
 
-      //  Literal
-      if (node.type === 'Literal') {
-        return node.value
-      }
+  nodes.push({ id: "1", label: "Start" })
 
-      //  Expression Statement
-      if (node.type === 'ExpressionStatement') {
-        return generate(node.expression)
-      }
+  let id = 2
 
-      //  Function Call
-      if (node.type === 'CallExpression') {
-        let funcName = ""
+  lines.forEach(line => {
+    nodes.push({
+      id: String(id),
+      label: line.trim()
+    })
 
-        if (node.callee.type === 'MemberExpression') {
-          funcName = `${node.callee.object.name}.${node.callee.property.name}`
-        } else {
-          funcName = node.callee.name
-        }
+    edges.push({
+      id: `e${id-1}-${id}`,
+      source: String(id - 1),
+      target: String(id)
+    })
 
-        let args = node.arguments.map(arg => generate(arg)).join(", ")
-        ir.push(`call ${funcName} ${args}`)
-      }
+    id++
+  })
 
-      return ""
-    }
+  nodes.push({
+    id: String(id),
+    label: "End"
+  })
 
-    ast.body.forEach(generate)
+  edges.push({
+    id: `e${id-1}-${id}`,
+    source: String(id - 1),
+    target: String(id)
+  })
 
-    res.json(ir.length ? ir : ["No IR generated"])
-
-  } catch (e) {
-    res.json({ error: e.toString() })
-  }
+  res.json({ nodes, edges })
 })
 
 app.listen(5000, () => {

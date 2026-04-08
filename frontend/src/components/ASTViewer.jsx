@@ -2,12 +2,10 @@ import Tree from "react-d3-tree"
 
 export default function ASTViewer({ treeData }) {
 
-  //  SAFE CHECK
   if (!treeData || treeData.error) {
     return <p>No AST available</p>
   }
 
-  //  CONVERT ACORN AST → TREE FORMAT
   const convert = (node) => {
     if (!node || typeof node !== "object") return null
 
@@ -30,26 +28,22 @@ export default function ASTViewer({ treeData }) {
     }
 
     return {
-      name: node.type || "node",
+      name: node.type || node.name || "node",
       children: children
     }
   }
 
-  let tree
-
-  try {
-    tree = convert(treeData)
-  } catch (err) {
-    return <p>Error rendering AST</p>
-  }
+  const tree = convert(treeData)
 
   return (
-    <div style={{ width: "100%", height: "500px" }}>
+    <div style={{ width: "100%", height: "600px" }}>
       <Tree
         data={tree}
         orientation="vertical"
+        translate={{ x: 350, y: 50 }}
+        separation={{ siblings: 2, nonSiblings: 2 }}
+        nodeSize={{ x: 200, y: 120 }}
         zoomable
-        translate={{ x: 250, y: 50 }}
       />
     </div>
   )

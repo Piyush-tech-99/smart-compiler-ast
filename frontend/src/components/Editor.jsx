@@ -1,22 +1,23 @@
-import MonacoEditor from '@monaco-editor/react'
+import Editor from "@monaco-editor/react"
 
-export default function Editor({ code, setCode }) {
+export default function CodeEditor({ code, setCode, language }) {
   return (
-    <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #ddd" }}>
-      <MonacoEditor
-        height="350px"
-        defaultLanguage="javascript"
-        theme="vs-light"
-        value={code}
-        onChange={(value) => setCode(value || "")}
-        options={{
-          fontSize: 14,
-          minimap: { enabled: false },
-          scrollBeyondLastLine: false,
-          wordWrap: "on",
-          padding: { top: 10 },
-        }}
-      />
-    </div>
+    <Editor
+      height="300px"
+      language={language}
+      value={code}
+      theme="vs-dark"
+      onChange={(value) => {
+        if (value !== undefined) {
+          setCode(value)
+        }
+      }}
+      options={{
+        fontSize: 14,
+        minimap: { enabled: false },
+        wordWrap: "on",
+        automaticLayout: true
+      }}
+    />
   )
 }
