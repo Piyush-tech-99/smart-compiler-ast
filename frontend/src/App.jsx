@@ -191,10 +191,10 @@ function App() {
 
         {/* RIGHT SIDE */}
         <div className="card">
-          <h3>🌳 AST</h3>
+          <h3>🌳 AST (Abstract Syntax Tree)</h3>
           {ast && !error ? <ASTViewer treeData={ast} /> : <p>No AST available</p>}
 
-          <h3>🔀 CFG</h3>
+          <h3>🔀 CFG (Control Flow Graph)</h3>
           {cfg && !error ? <CFGViewer data={cfg} /> : <p>No CFG available</p>}
         </div>
 
