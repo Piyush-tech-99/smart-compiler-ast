@@ -7,12 +7,10 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-
 app.post('/run', async (req, res) => {
   const { code, language } = req.body
 
   try {
-   
     if (language === "javascript") {
       let logs = []
 
@@ -196,6 +194,7 @@ app.post('/ir', (req, res) => {
 })
 
 
+// 🔥 FINAL CFG (NO OVERLAP FIX)
 app.post('/cfg', (req, res) => {
   const { code } = req.body
 
@@ -203,40 +202,87 @@ app.post('/cfg', (req, res) => {
 
   let nodes = []
   let edges = []
+  let id = 1
+  let edgeId = 1
 
-  nodes.push({ id: "1", label: "Start" })
+  function createNode(label) {
+    const node = { id: String(id++), label }
+    nodes.push(node)
+    return node.id
+  }
 
-  let id = 2
+  function createEdge(source, target, label = "", type = "straight") {
+    edges.push({
+      id: `e${edgeId++}`,
+      source,
+      target,
+      label,
+      type,
+      animated: type === "loop",
+      curvature: type === "loop" ? 0.5 : 0 // 👈 key fix
+    })
+  }
+
+  const start = createNode("Start")
+  let prev = start
+
+  let stack = []
 
   lines.forEach(line => {
-    nodes.push({
-      id: String(id),
-      label: line.trim()
-    })
+    const trimmed = line.trim()
 
-    edges.push({
-      id: `e${id-1}-${id}`,
-      source: String(id - 1),
-      target: String(id)
-    })
+    // LOOP
+    if (trimmed.startsWith("for") || trimmed.startsWith("while")) {
+      const cond = createNode(trimmed)
+      createEdge(prev, cond)
 
-    id++
+      stack.push({
+        type: "loop",
+        condition: cond
+      })
+
+      prev = cond
+      return
+    }
+
+    const current = createNode(trimmed)
+    createEdge(prev, current)
+
+    // LOOP BODY
+    if (stack.length > 0) {
+      let top = stack[stack.length - 1]
+      if (top.type === "loop") {
+        createEdge(top.condition, current, "true", "branch")
+      }
+    }
+
+    // LOOP END
+    if (trimmed === "}") {
+      let last = stack.pop()
+      if (last && last.type === "loop") {
+
+        // 🔥 CURVED LEFT LOOP EDGE
+        createEdge(current, last.condition, "loop", "loop")
+
+        const exit = createNode("Exit Loop")
+        createEdge(last.condition, exit, "false", "branch")
+
+        prev = exit
+        return
+      }
+    }
+
+    prev = current
   })
 
-  nodes.push({
-    id: String(id),
-    label: "End"
-  })
-
-  edges.push({
-    id: `e${id-1}-${id}`,
-    source: String(id - 1),
-    target: String(id)
-  })
+  const end = createNode("End")
+  createEdge(prev, end)
 
   res.json({ nodes, edges })
 })
 
+
+// 🚀 SERVER
 app.listen(5000, () => {
   console.log("🚀 Server running on http://localhost:5000")
 })
