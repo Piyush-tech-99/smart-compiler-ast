@@ -103,13 +103,14 @@ The main objective of Smart Compiler AST Analyzer is to make compiler design con
 - Enhanced code analysis and debugging features.
 
 ---
+
+## Screenshots
+
 <img width="1888" height="845" alt="Screenshot 2026-11-16 032950" src="https://github.com/user-attachments/assets/87710d5e-180a-442f-8438-5d121ea0f826" />
 <img width="891" height="812" alt="Screenshot 2026-11-16 033054" src="https://github.com/user-attachments/assets/db367d6c-f9ba-4540-a253-dfe3b31a86ac" />
 
-
 ---
 
-## Screenshots
 ## Author
 
 **Pranjal**
