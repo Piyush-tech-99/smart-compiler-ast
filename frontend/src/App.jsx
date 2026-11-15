@@ -183,7 +183,7 @@ function App() {
 
           {!error && ir.length > 0 && (
             <div>
-              <h4>IR</h4>
+              <h4>IR (Intermediate Representation)</h4>
               <pre>{JSON.stringify(ir, null, 2)}</pre>
             </div>
           )}

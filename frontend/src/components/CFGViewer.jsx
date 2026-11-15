@@ -1,32 +1,61 @@
 import ReactFlow, { Background, Controls } from "reactflow"
+import dagre from "dagre"
 import "reactflow/dist/style.css"
 
-export default function CFGViewer({ data }) {
-  if (!data || !data.nodes) {
-    return <p>No CFG available</p>
-  }
+const nodeWidth = 150
+const nodeHeight = 50
 
-  const nodes = data.nodes.map((n, index) => ({
+const getLayoutedElements = (nodes, edges) => {
+  const dagreGraph = new dagre.graphlib.Graph()
+  dagreGraph.setDefaultEdgeLabel(() => ({}))
+
+  dagreGraph.setGraph({
+    rankdir: "TB",
+    nodesep: 120,
+    ranksep: 150
+  })
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight })
+  })
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target)
+  })
+
+  dagre.layout(dagreGraph)
+
+  const layoutedNodes = nodes.map((node) => {
+    const pos = dagreGraph.node(node.id)
+    return {
+      ...node,
+      position: {
+        x: pos.x - nodeWidth / 2,
+        y: pos.y - nodeHeight / 2
+      }
+    }
+  })
+
+  return { nodes: layoutedNodes, edges }
+}
+
+export default function CFGViewer({ data }) {
+  if (!data || !data.nodes) return <p>No CFG available</p>
+
+  let nodes = data.nodes.map((n) => ({
     id: n.id,
     data: { label: n.label },
-
-    position: {
-      x: 250 + (index % 2 === 0 ? 0 : 40), 
-      y: index * 100
-    }
+    position: { x: 0, y: 0 }
   }))
 
-  const edges = (data.edges || []).map((e) => {
-    let edgeType = "default"
+  let edges = data.edges.map((e) => {
     let style = { stroke: "#555" }
 
     if (e.type === "loop") {
-      edgeType = "smoothstep"
       style = { stroke: "red", strokeWidth: 2 }
     }
 
     if (e.type === "branch") {
-      edgeType = "smoothstep"
       style = { stroke: "blue" }
     }
 
@@ -34,20 +63,19 @@ export default function CFGViewer({ data }) {
       id: e.id,
       source: e.source,
       target: e.target,
-      type: edgeType,
+      type: "smoothstep",
       label: e.label,
       animated: true,
-      style,
-
-      sourcePosition: "right",
-      targetPosition: "right"
+      style
     }
   })
 
+  const layouted = getLayoutedElements(nodes, edges)
+
   return (
-    <div style={{ height: "400px", border: "1px solid #ccc", borderRadius: "10px" }}>
-      <ReactFlow nodes={nodes} edges={edges} fitView>
-        <Background />
+    <div style={{ height: "700px", border: "1px solid #ccc", borderRadius: "10px" }}>
+      <ReactFlow nodes={layouted.nodes} edges={layouted.edges} fitView>
+        <Background gap={25} />
         <Controls />
       </ReactFlow>
     </div>

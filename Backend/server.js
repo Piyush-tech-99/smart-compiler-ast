@@ -194,7 +194,6 @@ app.post('/ir', (req, res) => {
 })
 
 
-// 🔥 FINAL CFG (NO OVERLAP FIX)
 app.post('/cfg', (req, res) => {
   const { code } = req.body
 
@@ -211,15 +210,12 @@ app.post('/cfg', (req, res) => {
     return node.id
   }
 
-  function createEdge(source, target, label = "", type = "straight") {
+  function createEdge(source, target, label = "") {
     edges.push({
       id: `e${edgeId++}`,
       source,
       target,
-      label,
-      type,
-      animated: type === "loop",
-      curvature: type === "loop" ? 0.5 : 0 // 👈 key fix
+      label
     })
   }
 
@@ -248,24 +244,21 @@ app.post('/cfg', (req, res) => {
     const current = createNode(trimmed)
     createEdge(prev, current)
 
-    // LOOP BODY
+    // LOOP BODY LINK
     if (stack.length > 0) {
       let top = stack[stack.length - 1]
       if (top.type === "loop") {
-        createEdge(top.condition, current, "true", "branch")
+        createEdge(top.condition, current, "true")
       }
     }
 
-    // LOOP END
     if (trimmed === "}") {
       let last = stack.pop()
       if (last && last.type === "loop") {
-
-        // 🔥 CURVED LEFT LOOP EDGE
-        createEdge(current, last.condition, "loop", "loop")
+        createEdge(current, last.condition, "back")
 
         const exit = createNode("Exit Loop")
-        createEdge(last.condition, exit, "false", "branch")
+        createEdge(last.condition, exit, "false")
 
         prev = exit
         return
